@@ -9,65 +9,19 @@ s.scope
 ~m.useDevice(0);
 ~m.darkness;
 
-
 // GRID
-
-~gridPitchValues = [0,0,0,0,0,0,0,0];
-~gridOctaveValues = [1,1,1,1,1,1,1,1];
-~gridRowInEditMode = [0,0,0,0,0,0,0,0]; // TODO: Boolean
+~grid = MonomeGrid.new(~m);
 
 ~octaves = [24,36,48,60,72];
-
 ~keysHeld = 0;
 
 ~initGrid = {
-	~gridPitchValues.do({ | xpos, row |
+	~grid.pitchValues.do({ | xpos, row |
 		~m.levrow(0,row,[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
 	})
 };
 
 ~initGrid.value;
-
-~gridSetPitch = { | row, xpos |
-	~gridDisplayRow.value(row);
-	~gridPitchValues[row] = xpos;
-	~setPitch.value(row, ~gridOctaveValues[row], ~gridPitchValues[row]);
-};
-
-~gridSetOctave = { | row, octave |
-	if(~gridRowInEditMode[row] == 1,
-		{
-			if(octave > 5, {
-				octave = 5;
-			});
-			~gridOctaveValues[row] = octave;
-			~gridDisplayEditRow.value(row);
-			~setPitch.value(row, ~gridOctaveValues[row], ~gridPitchValues[row]);
-		}
-	)
-};
-
-~gridDisplayRow = { | row |
-	var fillRowBefore;
-	var fillRowAfter;
-	var toFill;
-	var setRow;
-
-	fillRowBefore = Array.fill(~gridPitchValues[row], 2);
-	toFill = 15 - fillRowBefore.size;
-	fillRowAfter = Array.fill(toFill, 0);
-	setRow = fillRowBefore ++ Array.with(8) ++ fillRowAfter;
-	~m.levrow(0,row,setRow);
-};
-
-~gridDisplayEditRow = { | row |
-	var fillActiveOctave, fillOctaveAfter, setRow;
-
-	fillActiveOctave = Array.fill(~gridOctaveValues[row], 10);
-	fillOctaveAfter = Array.fill(15 - fillActiveOctave.size, 4);
-	setRow = fillActiveOctave ++ fillOctaveAfter ++ Array.with(0);
-	~m.levrow(0,row,setRow);
-};
 
 ~setPitch = { | synthNum, octave, note |
 	var frequency = ~calcPitch.value(octave, note);
@@ -91,38 +45,51 @@ OSCFunc.newMatching({ | message, time, addr, recvPort |
 		{ ~keysHeld = ~keysHeld - 1; });
 
 	if((gridX < 15 && (~keysHeld == 1) && (buttonDown == 1)),
-		{ ~gridSetPitch.value(gridY, gridX); },
+		{
+			var row = gridY;
+			row.postln;
+			gridX.postln;
+			~grid.setPitch(row, gridX);
+			~setPitch.value(row, ~grid.octaveValues[row], ~grid.pitchValues[row]);
+		},
 		{
 			// TODO: Check if edit mode active, not if 2 buttons held => Array.collect?
 			if((buttonDown == 1) && (~keysHeld == 1),
 				{
-					~gridRowInEditMode[gridY] = 1;
-					~gridDisplayEditRow.value(gridY);
+					var rowInEditMode = ~grid.rowInEditMode;
+					rowInEditMode[gridY] = 1;
+					~grid.rowInEditMode_(rowInEditMode);
+					~grid.displayEditRow(gridY);
 				},
 				{
 					if(~keysHeld == 0, {
-						~gridRowInEditMode[gridY] = 0;
-						~gridDisplayRow.value(gridY);
+						var rowInEditMode = ~grid.rowInEditMode;
+						rowInEditMode[gridY] = 0;
+						~grid.rowInEditMode_(rowInEditMode);
+						~grid.displayRow(gridY);
 					});
 
 				}
 			);
 
-			if((~keysHeld == 2) && (~gridRowInEditMode[gridY] == 1),
-				{ ~gridSetOctave.value(gridY, gridX + 1); }
+			if((~keysHeld == 2) && (~grid.rowInEditMode[gridY] == 1),
+				{
+					var row = gridY;
+					~grid.setOctave(gridY, gridX + 1);
+					~setPitch.value(row, ~grid.octaveValues[row], ~grid.pitchValues[row]);
+				}
 			);
 		}
 	);
 
 	message.postln;
 	~keysHeld.postln;
-	//~m.ledset(message[1], message[2], message[3]);
-	//~m.levset(message[1] - 1, message[2], 6);
 
 }, "/monome/grid/key");
 
 
 // ARC
+/*
 ~a = Arc.new("/monome", 0);
 ~a.useDevice(1);
 ~a.darkness;
@@ -192,7 +159,10 @@ OSCFunc.newMatching({ | message |
 
 	~arcSetFancyVal.value(enc, encVisualVal.floor);
 }, "/monome/enc/delta");
+*/
 )
+
+
 //
 // INITIALIZE SYNTHDEF
 //
@@ -223,8 +193,8 @@ SynthDef.new(\sineosc, { arg freq = 24.midicps, out = 0, dust_freq = 0.5, device
 // visual feedback
 OSCFunc.newMatching({ | message, time |
 	var row = message[2];
-	var xpos = ~gridPitchValues[row];
-	if(~gridRowInEditMode[row] == 0, {
+	var xpos = ~grid.pitchValues[row];
+	if(~grid.rowInEditMode[row] == 0, {
 		~m.levset(xpos,row, 12);
 		SystemClock.sched(0.1, {
 			~m.levset(xpos,row, 8);
@@ -233,50 +203,3 @@ OSCFunc.newMatching({ | message, time |
 }, "/tr", s.addr);
 )
 
-
-~m.ledall(0);
-~m.levrow(0,2,[2,2,2,2,2,2,8]);
-~m.levrow(0, 2, [ 8, 8, 15, 2, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8 ]);
-
-
-//
-//
-// legacy midi stuff
-//
-//
-
-MIDIClient.init;
-MIDIIn.connectAll;
-
-(
-MIDIFunc.cc({ |val, deviceNum, chan, src|
-	if((deviceNum >= 0) && (deviceNum <= 7), {
-		"FADE".postln;
-		"val: " + val.postln;
-		"num: " + deviceNum.postln;
-		"chan: " + chan.postln;
-		"src: " + src.postln;
-		"-----".postln;
-
-		~snths[deviceNum].set(
-			\dust_freq, val / 8
-		);
-	})
-});
-
-MIDIFunc.cc({ |val, deviceNum, chan, src|
-	if((deviceNum >= 16) && (deviceNum <= 23), {
-		deviceNum = deviceNum - 16;
-		"KNOB".postln;
-		"val: " + val.postln;
-		"num: " + deviceNum.postln;
-		"chan: " + chan.postln;
-		"src: " + src.postln;
-		"-----".postln;
-
-		~snths[deviceNum].set(
-			\freq, val * 8
-		);
-	});
-});
-)
