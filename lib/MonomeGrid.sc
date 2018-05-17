@@ -10,7 +10,7 @@ MonomeGrid {
 		device = gridDevice;
 		pitchValues = [0,0,0,0,0,0,0,0];
 		octaveValues = [1,1,1,1,1,1,1,1];
-		rowInEditMode = [0,0,0,0,0,0,0,0]
+		rowInEditMode = -1;
 	}
 
 
@@ -42,7 +42,7 @@ MonomeGrid {
 
 
 	setOctave { | row, octave |
-		if(rowInEditMode[row] == 1,
+		if(rowInEditMode == row,
 			{
 				if(octave > 5, {
 					octave = 5;
