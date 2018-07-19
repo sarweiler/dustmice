@@ -60,6 +60,10 @@ MonomeArc {
 		});
 	}
 
+	setEncoderVal { | enc, absoluteValue |
+		encoderValues[enc] = absoluteValue;
+	}
+
 
 	/* Private methods */
 

@@ -13,6 +13,12 @@ MonomeGrid {
 		rowInEditMode = -1;
 	}
 
+	initGrid {
+		pitchValues.do({ | xpos, row |
+			device.levrow(0,row,[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
+		});
+	}
+
 
 	displayRow { | row |
 		var fillRowBefore, fillRowAfter, toFill, setRow;
@@ -31,7 +37,7 @@ MonomeGrid {
 		fillActiveOctave = Array.fill(octaveValues[row], 10);
 		fillOctaveAfter = Array.fill(15 - fillActiveOctave.size, 4);
 		setRow = fillActiveOctave ++ fillOctaveAfter ++ Array.with(0);
-		~m.levrow(0,row,setRow);
+		device.levrow(0,row,setRow);
 	}
 
 
